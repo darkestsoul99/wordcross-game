@@ -1,0 +1,22 @@
+{
+  "name": "wordcross-game",
+  "version": "1.0.0",
+  "description": "Wordcross game with Phaser",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/darkestsoul99/wordcross-game.git"
+  },
+  "author": "berkekocadere",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/darkestsoul99/wordcross-game/issues"
+  },
+  "homepage": "https://github.com/darkestsoul99/wordcross-game#readme",
+  "dependencies": {
+    "phaser": "^3.87.0"
+  }
+}
