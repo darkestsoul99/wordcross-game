@@ -1,9 +1,17 @@
+import WordPlacer from './utils/WordPlacer.js';
+
 class ScrabbleGame extends Phaser.Scene {
     constructor() {
         super({ key: 'ScrabbleGame' });
         this.words = [
             "seat", "set", "eat", "east", "tea"
         ];
+        this.gridConfig = {
+            rows: 7,
+            cols: 7,
+            cellWidth: 100,
+            cellHeight: 100
+        }
     }
 
     preload() {
@@ -21,9 +29,9 @@ class ScrabbleGame extends Phaser.Scene {
     }
 
     create() {
-        // Create background
         this.createBackground();
         this.createGrid();
+        this.wordPlacer = new WordPlacer(this);
         this.refreshGame();
     }
 
@@ -31,15 +39,25 @@ class ScrabbleGame extends Phaser.Scene {
         this.updateBackground();
     }
 
+    /**
+     * Update the background images to create a scrolling effect
+     * **/
+    updateBackground() {
+        this.sky.tilePositionX += 0.2;
+        this.skyLine.tilePositionX += 0.3;
+        this.cloudsSmall.tilePositionX += 1;
+        this.cloudsBig.tilePositionX += 0.5;
+    }
+
     refreshGame() {
-        console.log("Game refreshed.");
-        let startRow = 2;
-        let startCol = 3;
-        let word = this.words.at(0);
-        let currentRow = startRow;
-        let currentCol = startCol;
-        
-        this.writeWord(word, currentCol, currentRow);
+        this.clearBoard();
+        this.wordPlacer.placeWords(this.words);
+    }
+
+    clearBoard() {
+        this.children.list
+            .filter(child => child.texture?.key === 'tiles')
+            .forEach(child => child.destroy());
     }
 
     createBackground() {
@@ -47,70 +65,148 @@ class ScrabbleGame extends Phaser.Scene {
         const height = this.scale.height;
         const refreshButtonOffset = 50;
         const cloudsOffset = 120;
-
+        
+        // Sky images
         this.sky = this.add.tileSprite(width * 0.5 , height * 0.5, width * 0.5, height * 0.5, 'background_1').setScale(2);
         this.skyLine = this.add.tileSprite(width * 0.5 , height * 0.5, width * 0.5, height * 0.5, 'background_2').setScale(2);
         this.cloudsSmall = this.add.tileSprite(width * 0.5 , height * 0.5 + cloudsOffset, width * 0.5, height * 0.5, 'background_3').setScale(2);
         this.cloudsBig = this.add.tileSprite(width * 0.5 , height * 0.5 + cloudsOffset, width * 0.5, height * 0.5, 'background_4').setScale(2);
+        
+        // Refresh button
         this.refreshButton = this.add.image(width - refreshButtonOffset, height - refreshButtonOffset, 'refresh').setScale(0.1);
-        this.refreshButton.setInteractive({useHandCursor: true});
-        this.refreshButton.on(Phaser.Input.Events.POINTER_DOWN, () => {
+        this.refreshButton.setInteractive({useHandCursor: true}).on(Phaser.Input.Events.POINTER_DOWN, () => {
             this.refreshGame();
+            this.refreshButton.disableInteractive();
+            this.tweens.add({
+                targets: this.refreshButton,
+                rotation: this.refreshButton.rotation + Math.PI * 2,
+                duration: 500,
+                ease: 'Cubic.easeInOut',
+                onComplete: () => {
+                    this.refreshButton.setInteractive({useHandCursor: true});
+                }
+            });
         });
     }
 
     createGrid() {
-        const width = this.scale.width;
-        const height = this.scale.height;
-    
-        this.grid = {
-            rows: 7,
-            cols: 8,
-            cellWidth: 100,
-            cellHeight: 100,
-            offsetX: (width - (8 * 100)) / 2,
-            offsetY: (height - (6 * 100)) / 2
-        };
+        this.initializeGridData();
+        this.createGridCells();
+    }
+
+    initializeGridData() {
+        const { rows, cols, cellWidth, cellHeight } = this.gridConfig;
         
+        this.grid = {
+            rows,
+            cols,
+            cellWidth,
+            cellHeight,
+            offsetX: (this.scale.width - (cols * cellWidth)) / 2,
+            offsetY: 100,
+            cells: Array(rows).fill().map(() => Array(cols).fill(null)) // a 2D array to store cell data
+        };
+    }
+
+    createGridCells() {
         for (let row = 0; row < this.grid.rows; row++) {
             for (let col = 0; col < this.grid.cols; col++) {
-                const x = col * this.grid.cellWidth + this.grid.offsetX;
-                const y = row * this.grid.cellHeight + this.grid.offsetY;
-
-                const rect = this.add.rectangle(x, y, this.grid.cellWidth, this.grid.cellHeight);
-                rect.setStrokeStyle(1, 0x000000);
+                const position = this.calculateCellPosition(row, col);
+                this.createCell(position, row, col);
             }
         }
     }
 
-    updateBackground() {
-        this.sky.tilePositionX += 0.2;
-        this.skyLine.tilePositionX += 0.3;
-        this.cloudsSmall.tilePositionX += 1;
-        this.cloudsBig.tilePositionX += 0.5;
+    /**
+     * Create a cell at a given position
+     * @param {Object} position - An object containing the x and y coordinates of the cell
+     * @param {number} row - The row index of the cell
+     * @param {number} col - The column index of the cell
+     * **/
+    createCell(position, row, col) {
+        const cell = this.createCellBackground(position);
+        const border = this.createCellBorder(position);
+        const shadow = this.createCellShadow(position);
+
+        this.grid.cells[row][col] = { x: position.x, y: position.y, rect: cell, border, shadow };
+
+        this.setupCellInteraction(cell, border);
     }
-    // seat
-    writeWord(word, currentCol, currentRow) {
-        for (let i = 0; i < word.length; i++) {
-            this.writeLetter(word[i], currentCol, currentRow);
-            this.words.filter(function(filteredWord) {
-                if (filteredWord.startsWith(word[i]) && !filteredWord.match(word)) {
-                    console.log("filtered Word found");
-                    console.log(filteredWord);
-                }
+
+    /**
+     * =====================
+     * = HELPER FUNCTIONS =
+     * =====================
+     */
+
+    /**
+     * Calculate the position of a cell based on its row and column
+     * @param {number} row - The row index of the cell  
+     * @param {number} col - The column index of the cell
+     * @returns {Object} - An object containing the x and y coordinates of the cell
+     * **/
+    calculateCellPosition(row, col) {
+        return {
+            x: col * this.grid.cellWidth + this.grid.offsetX,
+            y: row * this.grid.cellHeight + this.grid.offsetY
+        };
+    }
+
+    /**
+     * Create the background of a cell
+     * **/
+    createCellBackground(position) {
+        return this.add.rectangle(
+            position.x, 
+            position.y, 
+            this.grid.cellWidth - 4, 
+            this.grid.cellHeight - 4, 
+            0xffffff, 
+            0.2
+        );
+    }
+
+    /**
+     * Create the border of a cell
+     * **/
+    createCellBorder(position) {
+        const border = this.add.rectangle(
+            position.x, 
+            position.y, 
+            this.grid.cellWidth, 
+            this.grid.cellHeight
+        );
+        border.setStrokeStyle(2, 0x4a90e2);
+        return border;
+    }
+
+    /**
+     * Create the shadow of a cell
+     * **/
+    createCellShadow(position) {
+        const shadow = this.add.rectangle(
+            position.x + 2, 
+            position.y + 2, 
+            this.grid.cellWidth - 4, 
+            this.grid.cellHeight - 4
+        );
+        shadow.setStrokeStyle(1, 0x000000, 0.1);
+        return shadow;
+    }
+
+    /**
+     * Setup the interaction for a cell
+     * **/
+    setupCellInteraction(cell, border) {
+        cell.setInteractive()
+            .on('pointerover', () => {
+                cell.setFillStyle(0x4a90e2, 0.1);
+                border.setStrokeStyle(2, 0x2171cd);
+            })
+            .on('pointerout', () => {
+                cell.setFillStyle(0xffffff, 0.2);
+                border.setStrokeStyle(2, 0x4a90e2);
             });
-            currentCol++;
-        }
-    }
-
-    writeLetter(index, currentCol, currentRow) {
-        const letter = index;
-        const letterFrame = `letter_${letter.toUpperCase()}.png`;
-
-        const x = currentCol * this.grid.cellWidth + this.grid.offsetX;
-        const y = currentRow * this.grid.cellHeight + this.grid.offsetY;
-
-        const sprite = this.add.sprite(x, y, 'tiles', letterFrame).setScale(0.3);
     }
 }
 
@@ -118,14 +214,7 @@ var config = {
     type: Phaser.AUTO,
     width: 1024,
     height: 768,
-    scene: ScrabbleGame,
-    physics: {
-        default: 'arcade',
-        arcade: {
-            gravity: { y: 0 },
-            debug: false
-        }
-    }
+    scene: ScrabbleGame
 };
 
 var game = new Phaser.Game(config);
