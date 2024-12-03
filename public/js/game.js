@@ -5,13 +5,13 @@ class ScrabbleGame extends Phaser.Scene {
         super({ key: 'ScrabbleGame' });
         this.words = [
             "seat", "set", "eat", "east", "tea"
-        ];
+        ]; // The words that will be used in the game
         this.gridConfig = {
             rows: 7,
             cols: 7,
             cellWidth: 100,
             cellHeight: 100
-        }
+        } // The configuration for the grid
     }
 
     preload() {
@@ -49,11 +49,17 @@ class ScrabbleGame extends Phaser.Scene {
         this.cloudsBig.tilePositionX += 0.5;
     }
 
+    /**
+     * Refresh the game by clearing the board and placing new words
+     * **/
     refreshGame() {
         this.clearBoard();
         this.wordPlacer.placeWords(this.words);
     }
 
+    /**
+     * Clear the board by destroying all tiles
+     * **/
     clearBoard() {
         this.children.list
             .filter(child => child.texture?.key === 'tiles')
@@ -86,9 +92,12 @@ class ScrabbleGame extends Phaser.Scene {
                     this.refreshButton.setInteractive({useHandCursor: true});
                 }
             });
-        });
+        }); // Refresh button is set to interactive and when clicked, it refreshes the game, and rotates 360 degrees for a cool effect
     }
 
+    /**
+     * Create the grid by initializing the grid data and creating the cells
+     * **/
     createGrid() {
         this.initializeGridData();
         this.createGridCells();
@@ -105,9 +114,12 @@ class ScrabbleGame extends Phaser.Scene {
             offsetX: (this.scale.width - (cols * cellWidth)) / 2,
             offsetY: 100,
             cells: Array(rows).fill().map(() => Array(cols).fill(null)) // a 2D array to store cell data
-        };
+        }; // Initialize the grid data
     }
 
+    /**
+     * Create the cells by iterating through the grid and creating the cells
+     * **/
     createGridCells() {
         for (let row = 0; row < this.grid.rows; row++) {
             for (let col = 0; col < this.grid.cols; col++) {
@@ -141,9 +153,6 @@ class ScrabbleGame extends Phaser.Scene {
 
     /**
      * Calculate the position of a cell based on its row and column
-     * @param {number} row - The row index of the cell  
-     * @param {number} col - The column index of the cell
-     * @returns {Object} - An object containing the x and y coordinates of the cell
      * **/
     calculateCellPosition(row, col) {
         return {
